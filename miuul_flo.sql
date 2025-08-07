@@ -182,4 +182,45 @@ select master_id,
 		from flo_data
 		where last_order_date = (select max(last_order_date)
 								from flo_data)
-		
+
+--*******************************************************************************
+
+select customer_value_total_ever_online ,count(*) as count  --online alisveris harcamalarında 
+from flo_data												--aynı harcamaların sayisi	
+group by customer_value_total_ever_online
+having count(*) > 1
+
+
+select 	customer_value_total_ever_online ,					--dense_rank aynı değerlere aynı numarayı verir
+		last_order_channel,									--row_number ise sıralar ayrı olur		
+		dense_rank() over(
+		PARTITION BY last_order_channel
+		order by customer_value_total_ever_online desc) as sira
+		from flo_data
+
+--*******************************************************************************
+
+SELECT *
+FROM flo_data
+WHERE last_order_channel IN (  			--1'den fazla benzer sayıda ifadeleri bulur
+    SELECT last_order_channel
+    FROM flo_data
+    GROUP BY last_order_channel
+    HAVING COUNT(*) > 1
+)
+
+--*******************************************************************************
+
+SELECT  order_num_total_ever_offline,  
+CASE 
+WHEN  order_num_total_ever_offline = 1 THEN 'denemelik' 	--if else yapısı
+WHEN  order_num_total_ever_offline < 4 THEN 'daimi müster' 
+ELSE 'alisveris manyağı' 
+END AS ilgi 
+FROM flo_data; 
+--*******************************************************************************
+
+SELECT ProductID, SUM(Quantity) AS ToplamAdet 
+FROM OrderDetails 
+GROUP BY ProductID 
+HAVING SUM(Quantity) > 1000; 
