@@ -251,5 +251,28 @@ from 	 flo_data
 group by master_id 
 
 --*******************************************************************************
+--toplam alisveris tutarını bir önceki ve bir sonraki müsteri ile karşılaştırma
+
+WITH alisveris AS (
+    SELECT 
+        master_id, 
+        SUM(customer_value_total_ever_online) AS toplam_alisveris
+    FROM flo_data
+    GROUP BY master_id
+)
+SELECT
+    master_id,
+    toplam_alisveris,
+    LAG(toplam_alisveris) OVER (ORDER BY toplam_alisveris DESC) AS OncekiSatis,
+    LEAD(toplam_alisveris) OVER (ORDER BY toplam_alisveris DESC) AS SonrakiSatis
+FROM alisveris
+ORDER BY toplam_alisveris DESC
+
+select  master_id ,customer_value_total_ever_online
+from flo_data
+where master_id = '47a642fe-975b-11eb-8c2a-000d3a38a36f'
+
+--*******************************************************************************
 
  
+
