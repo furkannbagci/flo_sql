@@ -26,8 +26,8 @@ select sum(customer_value_total_ever_online+customer_value_total_ever_offline) /
 
 --5. En son alışveriş yapılan kanal üzerinden yapılan alışverişlerin toplam ciro ve alışveriş sayılarını getirecek sorgu
 select last_order_channel,
-		sum(customer_value_total_ever_online+customer_value_total_ever_offline),
-		sum(order_num_total_ever_online+order_num_total_ever_offline) 
+		sum(customer_value_total_ever_online+customer_value_total_ever_offline) as ciro,
+		sum(order_num_total_ever_online+order_num_total_ever_offline) as adet 
 		from flo_data
 		group by last_order_channel
 
@@ -68,33 +68,47 @@ select
 		order by siparis_adedi desc
 
 
---select 
---		interested_in_categories_12, 
---		sum(order_num_total_ever_online+order_num_total_ever_offline) as siparis_adedi
---		from flo_data,son_siparis_tarihi
---		where son_siparis_tarihi.son_tarih - last_order_date < 365
---		group by interested_in_categories_12
---		order by siparis_adedi desc
-
-
 -- 10. En çok tercih edilen store_type bilgisini getiren sorgu
 
 select store_type,
-		sum(order_num_total_ever_online+order_num_total_ever_offline) as toplam_siparis
+		--tablodaki kategori başına siparişlerin toplamı
+		sum(order_num_total_ever_online+order_num_total_ever_offline) as toplam_siparis 
 		from flo_data
 		group by store_type
 		order by toplam_siparis desc
 		limit 1
 
+--------------------------------------------
+select store_type,
+		--tabloda yer alan kategori sayısı
+		count(*) frekans  
+		from flo_data
+		group by store_type
+		order by frekans desc
+		limit 1
+
+		
 --11. En son alışveriş yapılan kanal bazında, en çok ilgi gören kategoriyi ve bu kategoriden ne kadarlık alışveriş yapıldığını getiren sorgu
 
-select  last_order_channel,
-		interested_in_categories_12,
-		sum(customer_value_total_ever_online+customer_value_total_ever_offline) as tutar,
-		sum(order_num_total_ever_online+order_num_total_ever_offline) as  adet
-		from flo_data
-		group by last_order_channel,interested_in_categories_12
-		order by adet desc 
+WITH category_totals AS (
+    SELECT
+        last_order_channel,
+        interested_in_categories_12 AS kategori,
+        SUM(order_num_total_ever_online + order_num_total_ever_offline) AS alisveris_sayisi,
+        ROW_NUMBER() OVER (
+            PARTITION BY last_order_channel 
+            ORDER BY SUM(order_num_total_ever_online + order_num_total_ever_offline) DESC
+        ) AS rn
+    FROM flo_data
+    GROUP BY last_order_channel, interested_in_categories_12
+)
+SELECT
+    last_order_channel,
+    kategori,
+    alisveris_sayisi
+FROM category_totals
+WHERE rn = 1;
+
 
 -- 12. En çok alışveriş yapan kişinin ID’ sini getiren sorgu
 select 	master_id,
@@ -109,15 +123,20 @@ select 	master_id,
 select 	master_id ,
 		sum(customer_value_total_ever_online+customer_value_total_ever_offline) /
 		sum(order_num_total_ever_online+order_num_total_ever_offline) as ortalama_ciro,
-		(last_order_date - first_order_date)/sum(order_num_total_ever_online+order_num_total_ever_offline) as alisveris_frekansi_gun
+		(last_order_date - first_order_date)/(order_num_total_ever_online+order_num_total_ever_offline) as alisveris_frekansi_gun
 		from flo_data
 		group by master_id
 		order by sum(order_num_total_ever_online+order_num_total_ever_offline) desc
 
 
 --14. En çok alışveriş yapan (ciro bazında) ilk 100 kişinin alışveriş yapma gün ortalamasını (alışveriş sıklığını) getiren sorgu
+
 select 	master_id ,
-		(last_order_date - first_order_date)/sum(order_num_total_ever_online+order_num_total_ever_offline) as alisveris_frekansi_gun
+		ROUND(
+        (last_order_date - first_order_date) / 
+        SUM(order_num_total_ever_online + order_num_total_ever_offline)::numeric,1) AS alisveris_frekansi_gun,
+		sum(order_num_total_ever_online+order_num_total_ever_offline) as toplam_alisveris_sayisi, 
+		sum(customer_value_total_ever_online+customer_value_total_ever_offline) as ciro
 		from flo_data
 		group by master_id
 		order by sum(customer_value_total_ever_online+customer_value_total_ever_offline)  desc
@@ -125,12 +144,25 @@ select 	master_id ,
 
 --15. En son alışveriş yapılan kanal (last_order_channel) kırılımında en çok alışveriş yapan müşteriyi getiren sorguyu yazınız. 
 
-select  last_order_channel,
-		master_id
-		from flo_data 
+with kategori_ayrımı as(
+	select
+		last_order_channel,
+		master_id,
+		sum(order_num_total_ever_online + order_num_total_ever_offline) as alisveris_sayisi,
+		row_number() over(
+			PARTITION BY last_order_channel
+			order by sum(order_num_total_ever_online + order_num_total_ever_offline) desc
+		) as kategori
+		from flo_data
 		group by last_order_channel,master_id
-		order by sum(order_num_total_ever_online+order_num_total_ever_offline) desc
-		limit 1
+)
+
+select 	last_order_channel,
+		master_id,
+		alisveris_sayisi
+		from kategori_ayrımı
+		where kategori=1
+
 
 --16. En son alışveriş yapan kişinin ID’ sini getiren sorguyu yazınız. (Max son tarihte birden fazla alışveriş yapan ID bulunmakta. Bunları da getiriniz.) 
 with son_tarih as (
@@ -144,4 +176,10 @@ select 	master_id,
 		cross join son_tarih
 		where last_order_date = son_tarih.son_tarih
 		group by master_id
+-----------------------------------------------------------
+select master_id,
+		last_order_date
+		from flo_data
+		where last_order_date = (select max(last_order_date)
+								from flo_data)
 		
