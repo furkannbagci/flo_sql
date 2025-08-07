@@ -210,17 +210,46 @@ WHERE last_order_channel IN (  			--1'den fazla benzer sayıda ifadeleri bulur
 )
 
 --*******************************************************************************
-
+--if else yapısı
 SELECT  order_num_total_ever_offline,  
 CASE 
-WHEN  order_num_total_ever_offline = 1 THEN 'denemelik' 	--if else yapısı
+WHEN  order_num_total_ever_offline = 1 THEN 'denemelik' 	
 WHEN  order_num_total_ever_offline < 4 THEN 'daimi müster' 
 ELSE 'alisveris manyağı' 
 END AS ilgi 
 FROM flo_data; 
 --*******************************************************************************
 
-SELECT ProductID, SUM(Quantity) AS ToplamAdet 
-FROM OrderDetails 
-GROUP BY ProductID 
-HAVING SUM(Quantity) > 1000; 
+--ONLİNE ALİSVERİSİ 20'DEN AZ OLAN KİSİLERİN ORDER CHANNELI
+SELECT master_id,
+sum(order_num_total_ever_offline) as toplam_siparis_adedi
+FROM flo_data
+GROUP BY  master_id
+HAVING sum(order_num_total_ever_offline) > 8; 
+
+--*******************************************************************************
+
+--KİSİLERİN SAYİSİ
+select last_order_channel,
+count(*) as kisi_sayisi
+from flo_data
+where order_num_total_ever_offline > 8
+group by last_order_channel
+
+--*******************************************************************************
+--kategorileri gruplayıp her biri için sipariş verme tarihi sırlaması
+select master_id,interested_in_categories_12,
+row_number() over(
+PARTITION by interested_in_categories_12 order by last_order_date desc) as offline_siparis
+from flo_data
+
+--*******************************************************************************
+--virgül yucarlama
+select 	 master_id,
+		 round(sum(customer_value_total_ever_online)::numeric,1)
+from 	 flo_data
+group by master_id 
+
+--*******************************************************************************
+
+ 
